@@ -33,8 +33,6 @@ if ($errorReporting = $appConfig['error_reporting'] ?? '') {
     error_reporting($errorReporting);
 }
 
-$cli = Container::get(Command::class);
-
 if (!in_array($argv[1] ?? '', ['start', 'restart', 'stop', 'status', 'reload', 'connections'])) {
     require_once __DIR__ . '/support/bootstrap.php';
 } else {
@@ -45,6 +43,7 @@ if (!in_array($argv[1] ?? '', ['start', 'restart', 'stop', 'status', 'reload', '
     }
 }
 
+$cli = Container::get(Command::class);
 $cli->setName('webman cli');
 $cli->installInternalCommands();
 if (is_dir($command_path = Util::guessPath(app_path(), '/command', true))) {
