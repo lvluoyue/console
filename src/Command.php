@@ -3,13 +3,18 @@
 namespace Webman\Console;
 
 use RuntimeException;
+use support\Container;
 use Symfony\Component\Console\Application;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command as Commands;
-use support\Container;
+use Symfony\Component\Console\CommandLoader\ContainerCommandLoader;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
 
 class Command extends Application
 {
+    protected array $commands = [];
+
     public function installInternalCommands()
     {
         $this->installCommands(__DIR__ . '/Commands', 'Webman\Console\Commands');
@@ -31,7 +36,7 @@ class Command extends Application
             $relativePath = str_replace(str_replace('/', '\\', $path . '\\'), '', str_replace('/', '\\', $file->getRealPath()));
             // app\command\abc
             $realNamespace = trim($namespace . '\\' . trim(dirname(str_replace('\\', DIRECTORY_SEPARATOR, $relativePath)), '.'), '\\');
-            $realNamespace =  str_replace('/', '\\', $realNamespace);
+            $realNamespace = str_replace('/', '\\', $realNamespace);
             // app\command\doc\def
             $class_name = trim($realNamespace . '\\' . $file->getBasename('.php'), '\\');
             if (!class_exists($class_name) || !is_a($class_name, Commands::class, true)) {
@@ -53,21 +58,23 @@ class Command extends Application
         if (!empty($attributes)) {
             $properties = current($attributes)->newInstance();
             $name = $properties->name;
-            $description = $properties->description;
         } else {
             $properties = $reflection->getStaticProperties();
             $name = $properties['defaultName'] ?? null;
             if (!$name) {
                 throw new RuntimeException("Command {$class_name} has no defaultName");
             }
-            $description = $properties['defaultDescription'] ?? null;
+            $description = $properties['defaultDescription'] ?? '';
+            $command = Container::get($class_name);
+            $command->setName($name)->setDescription($description);
         }
-        $command = Container::get($class_name);
-        $command->setName($name);
-        if ($description) {
-            $command->setDescription($description);
-        }
-        $this->add($command);
-        return $command;
+        $this->commands[$name] = $class_name;
+    }
+
+    public function run(?InputInterface $input = null, ?OutputInterface $output = null): int
+    {
+        $this->setCommandLoader(new ContainerCommandLoader(Container::instance(), $this->commands));
+        unset($this->commands);
+        parent::run();
     }
 }
